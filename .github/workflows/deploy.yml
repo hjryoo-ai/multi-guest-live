@@ -1,0 +1,70 @@
+name: Deploy
+
+# ─── 상태: 골격 (PR #1 chore/branching-infra) ───────────────────────────
+# 이 워크플로는 아직 "휴면" 상태다. 파이프라인 형태(빌드 → GHCR push → git 태그)와
+# 권한만 확정해 두고, 실제 발화는 하지 않는다(workflow_dispatch 수동 전용).
+#
+# #7 chore/cd-wire 에서 완성:
+#   1. apps/api/Dockerfile 추가 (빌드 대상 확보)
+#   2. 트리거를 `on: workflow_run(CI, main, success)` 로 전환 → main 머지 + CI 그린 후 자동 배포
+#   3. VPS SSH 배포 스텝 추가 (시크릿: VPS_HOST, VPS_SSH_KEY)
+# web 은 Vercel 이 main 을 자동 추적하므로 이 워크플로 대상 아님.
+# ────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+
+# 배포는 취소하지 말고 직렬화(이미지 push 중간 중단 방지).
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # git 태그 deploy-* push
+  packages: write   # GHCR push
+
+jobs:
+  build-and-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # 골격 단계: 빌드 대상(Dockerfile)이 아직 없으면 명확히 실패시켜
+      # "우연히 그린"으로 오해되지 않게 한다. #7 에서 Dockerfile 추가되면 통과.
+      - name: 전제 확인 (Dockerfile)
+        run: |
+          if [ ! -f apps/api/Dockerfile ]; then
+            echo "::error::apps/api/Dockerfile 이 없습니다. deploy 는 #7(chore/cd-wire)에서 활성화됩니다."
+            exit 1
+          fi
+
+      - name: 짧은 SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 이미지 빌드 & push (sha + latest)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/api:sha-${{ steps.sha.outputs.short }}
+            ghcr.io/${{ github.repository }}/api:latest
+
+      # #7: 여기에 VPS SSH → `docker compose pull && up -d` 스텝 추가
+
+      - name: 배포 태그 push
+        run: |
+          TAG="deploy-$(date -u +%Y%m%d-%H%M%S)"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "tagged $TAG @ sha-${{ steps.sha.outputs.short }}"

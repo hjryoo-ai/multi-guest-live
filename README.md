@@ -4,7 +4,7 @@
 **모든 참가자의 오디오가 모든 참가자에게 도달함을 구조적으로 보장**하는 것이 핵심 목표이며,
 라우팅은 전적으로 LiveKit(SFU)에 위임한다.
 
-> 🚧 **개인 포트폴리오 프로젝트 · 진행 중 (Phase 7-lite).** 모든 변경은 CI 게이트(verify + Playwright E2E)를 통과한 PR로만 main에 진입한다.
+> 🚧 **개인 포트폴리오 프로젝트 · 진행 중 (Phase 7-lite).** 모든 변경은 CI 게이트(verify + Playwright E2E)를 통과한 PR로만 main에 진입한다. — [브랜치 전략](docs/branching.md)
 
 ## 스택
 
