@@ -5,6 +5,7 @@ import {
 } from "livekit-server-sdk";
 import { SIGNAL_EVENTS, type RoomDto } from "@multi-live/shared";
 import { config } from "../config.js";
+import { withLivekitTimeout } from "../lib/livekitTimeout.js";
 import { livekitRoomName, sendSignal } from "./livekit.js";
 import { setEgressState, fallbackToWebrtc, getEgressId } from "./rooms.js";
 import { metrics } from "./metrics.js";
@@ -47,10 +48,13 @@ export async function startHlsEgress(roomId: string): Promise<string> {
     protocol: SegmentedFileProtocol.HLS_PROTOCOL,
   });
 
-  const info = await egressClient.startRoomCompositeEgress(
-    livekitRoomName(roomId),
-    { segments: output },
-    { layout: "grid" },
+  const info = await withLivekitTimeout(
+    egressClient.startRoomCompositeEgress(
+      livekitRoomName(roomId),
+      { segments: output },
+      { layout: "grid" },
+    ),
+    "startRoomCompositeEgress",
   );
   return info.egressId;
 }
@@ -58,7 +62,7 @@ export async function startHlsEgress(roomId: string): Promise<string> {
 /** egress 중지(멱등). 이미 종료됐거나 없는 egress 는 무시. */
 export async function stopHlsEgress(egressId: string): Promise<void> {
   try {
-    await egressClient.stopEgress(egressId);
+    await withLivekitTimeout(egressClient.stopEgress(egressId), "stopEgress");
   } catch (err) {
     console.warn(`[egress] stop(${egressId}) ignored:`, (err as Error).message);
   }

@@ -69,6 +69,8 @@ const envSchema = z
     LIVEKIT_API_KEY: z.string().min(1).default(DEV_LIVEKIT_KEY),
     LIVEKIT_API_SECRET: z.string().min(1).default(DEV_LIVEKIT_SECRET),
     LIVEKIT_URL: z.string().min(1).default("http://localhost:7880"),
+    // LiveKit REST 호출 상한(ms). 기본 10s — CI/로컬 정상 경로 오탐 방지 여유.
+    LIVEKIT_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
     AUTH_SECRET: z.string().min(1).default(DEV_AUTH_SECRET),
     // 브라우저 노출용(옵션).
     NEXT_PUBLIC_API_URL: z.string().optional(),
@@ -208,6 +210,8 @@ export const config = {
     url: env.LIVEKIT_URL,
     // 브라우저가 접속할 WebSocket 주소 (토큰 응답에 포함)
     wsUrl: env.NEXT_PUBLIC_LIVEKIT_URL ?? "ws://localhost:7880",
+    // RoomServiceClient/EgressClient REST 호출 상한(ms). withLivekitTimeout 기본값.
+    timeoutMs: env.LIVEKIT_TIMEOUT_MS,
   },
   authSecret: env.AUTH_SECRET,
   corsOrigins,

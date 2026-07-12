@@ -341,6 +341,8 @@ export const ERROR_CODES = {
   cannotKickHost: "cannot_kick_host",
   notApprovedPublisher: "not_approved_publisher",
   alreadyApprovedOtherRole: "already_approved_other_role",
+  // 업스트림(LiveKit)
+  livekitTimeout: "livekit_timeout",
   // 초대
   invalidInvite: "invalid_invite",
   invalidSignature: "invalid_signature",
