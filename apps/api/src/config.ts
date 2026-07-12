@@ -1,5 +1,6 @@
 import "dotenv/config";
 import path from "node:path";
+import { isIP } from "node:net";
 import { z } from "zod";
 
 /**
@@ -22,6 +23,37 @@ const KNOWN_WEAK = new Set<string>([
   "change_me",
   "devsecret",
 ]);
+
+/**
+ * TRUST_PROXY — Fastify trustProxy 로 넘길 값(§7-lite 1-1).
+ *   미설정/"false" → false (직결: XFF 불신, req.ip=소켓 — 가장 안전한 기본값)
+ *   "true"         → true  (전 홉 신뢰 · 비권장 — leftmost XFF 위조 가능)
+ *   정수 "1"       → 홉 수  (프로덕션 Caddy 1대 뒤 권장 — 오른쪽 1홉만 신뢰 → 위조 무력화)
+ *   IP/CIDR CSV    → 배열   (특정 프록시만 신뢰: "10.0.0.0/8,127.0.0.1")
+ */
+function trustProxyError(raw: string): string | null {
+  const v = raw.trim();
+  if (v === "" || v === "true" || v === "false" || /^\d+$/.test(v)) return null;
+  for (const item of v.split(",").map((s) => s.trim()).filter(Boolean)) {
+    const [addr, suffix, ...rest] = item.split("/");
+    if (rest.length > 0 || !addr || isIP(addr) === 0)
+      return `'${item}' 는 IP/CIDR 형식이 아닙니다`;
+    if (suffix !== undefined) {
+      const bits = Number(suffix);
+      const max = isIP(addr) === 6 ? 128 : 32;
+      if (!/^\d+$/.test(suffix) || bits < 0 || bits > max)
+        return `'${item}' 의 CIDR 접두길이가 범위를 벗어남(0–${max})`;
+    }
+  }
+  return null;
+}
+function parseTrustProxy(raw?: string): boolean | number | string[] {
+  const v = (raw ?? "").trim();
+  if (v === "" || v === "false") return false;
+  if (v === "true") return true;
+  if (/^\d+$/.test(v)) return Number(v);
+  return v.split(",").map((s) => s.trim()).filter(Boolean);
+}
 
 const envSchema = z
   .object({
@@ -49,8 +81,20 @@ const envSchema = z
     METRICS_TOKEN: z.string().optional(),
     // 요청 body 상한(바이트). 기본 1MB.
     BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(1_048_576),
+    // 리버스 프록시 신뢰 설정(위 parseTrustProxy 참조). 미설정=직결(false).
+    TRUST_PROXY: z.string().optional(),
   })
   .superRefine((env, ctx) => {
+    // 형식 fail-fast(전 환경) — 잘못된 CIDR/IP 는 부트에서 즉시 거부(C-3 원칙).
+    if (env.TRUST_PROXY !== undefined) {
+      const err = trustProxyError(env.TRUST_PROXY);
+      if (err)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["TRUST_PROXY"],
+          message: `TRUST_PROXY ${err}`,
+        });
+    }
     if (env.NODE_ENV !== "production") return;
     // 프로덕션 강제: 시크릿 강도 + CORS 명시.
     const strongSecret = (name: "AUTH_SECRET" | "LIVEKIT_API_SECRET") => {
@@ -130,6 +174,8 @@ export const config = {
   authSecret: env.AUTH_SECRET,
   corsOrigins,
   bodyLimit: env.BODY_LIMIT_BYTES,
+  // 리버스 프록시 뒤 req.ip 산출 신뢰 정책(Fastify trustProxy 로 전달).
+  trustProxy: parseTrustProxy(env.TRUST_PROXY),
   tokenTtlSec: env.TOKEN_TTL_SEC,
   metricsToken: env.METRICS_TOKEN,
   // HLS egress 출력 디렉터리(egress 컨테이너의 /out 공유 볼륨과 대응). /hls 로 정적 서빙.

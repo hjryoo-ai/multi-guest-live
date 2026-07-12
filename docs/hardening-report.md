@@ -66,6 +66,24 @@
 - **Postgres**: 유일한 영속 상태(방·참가자·채팅·모더레이션 로그). 정기 `pg_dump`(예: 시간별, 보존 7~30일) 권장.
 - **Redis**: **전부 재구축 가능**(presence·채팅 캐시·초대코드·host 유예·rate limit 카운터). 소멸 시 — presence 는 webhook 재수신으로 복원, 캐시는 재계산, 유예키 소멸은 안전측(스위퍼가 재평가), rate limit 리셋은 무해. → **휘발 허용**, 백업 불필요.
 
+## Phase 7-lite §1-1 — 리버스 프록시 신뢰 (보안 수정 · 후속)
+
+**발견(취약)**: `index.ts` 의 `trustProxy: true` 하드코딩이 `X-Forwarded-For` 의 **leftmost** 값을
+`req.ip` 로 채택 → 직결 클라이언트가 `X-Forwarded-For: <임의 IP>` 한 줄로 IP 정체성을 위조 가능.
+결과로 6.5 A-3 의 **IP 키 rate limit**(`/auth/session` 익명 세션 폭증 차단·초대코드 무차별 대입 방어)이
+매 요청 위조 IP 를 바꾸면 버킷을 회피, **헤더 조작만으로 우회 가능**한 상태였다.
+
+**수정**:
+- `trustProxy` 를 `TRUST_PROXY` env 로 구동. 기본 **false(직결·XFF 불신)**, 프로덕션은 **`1`(Caddy 1홉)**
+  → 오른쪽 1홉만 신뢰하므로 leftmost 위조값 무시. 잘못된 IP/CIDR 형식은 부트에서 fail-fast(C-3).
+- rate limit 코드는 **무변경**(키 전략·loopback 예외 정책 그대로) — 결함은 `req.ip` 산출 신뢰에 있었음.
+- 프록시 배선 가이드: `docs/deploy/reverse-proxy.md`(Caddy 가 XFF 를 실제 IP 로 덮어씀 → 클라 위조 무시).
+
+**검증**(`verify:phase7`, 게이트 편입): 격리 서버 2개로 매트릭스 양쪽 —
+- A) `TRUST_PROXY=1`: leftmost 주입 무력화 + 서로 다른 IP 버킷 분리.
+- B) `TRUST_PROXY` 미설정·production: XFF 완전 무시(소켓 IP 합산) + **프로덕션 loopback 비예외 직접 관측**
+  (6.5 때 "로컬 429 미검(loopback 예외)"으로 남겼던 A-3 IP 상한을 이제 관측으로 고정).
+
 ## AC 충족
 
 - ✅ 참가자 발신으로 서버 신호 위조 불가(e2e)

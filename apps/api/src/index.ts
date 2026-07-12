@@ -26,8 +26,11 @@ export async function buildServer() {
   const app = Fastify({
     // A-4-4: 요청 body 상한(webhook raw body 포함 전역 적용).
     bodyLimit: config.bodyLimit,
-    // 프록시 뒤(프로덕션)에서 req.ip 를 XFF 기준으로 — rate limit IP 키 정확도.
-    trustProxy: true,
+    // req.ip 산출 시 X-Forwarded-For 신뢰 정책(TRUST_PROXY env). 기본 false=직결(소켓 IP).
+    // 보안: 이전엔 `true`(전 홉 신뢰)라 leftmost XFF 를 취해 클라이언트가 IP 를 위조 →
+    //   IP 키 rate limit(/auth/session·초대코드 무차별 대입 방어) 우회 가능했다.
+    //   프로덕션은 TRUST_PROXY=1(Caddy 1홉)로 오른쪽 1홉만 신뢰 → 위조 무력화. (§7-lite 1-1)
+    trustProxy: config.trustProxy,
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
       // A-5-1: 토큰·시크릿이 로그에 남지 않도록 민감 헤더 마스킹.

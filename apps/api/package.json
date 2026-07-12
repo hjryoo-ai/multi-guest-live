@@ -20,7 +20,8 @@
     "verify:phase6b": "tsx scripts/verify-phase6b.ts",
     "verify:phase65a": "tsx scripts/verify-phase65a.ts",
     "verify:phase65b": "tsx scripts/verify-phase65b.ts",
-    "verify:phase65c": "tsx scripts/verify-phase65c.ts"
+    "verify:phase65c": "tsx scripts/verify-phase65c.ts",
+    "verify:phase7": "tsx scripts/verify-phase7.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
