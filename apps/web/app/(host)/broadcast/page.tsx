@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -25,7 +25,16 @@ import { ViewerCount } from "../../../components/ViewerCount";
 import { EgressFallbackBanner } from "../../../components/EgressFallbackBanner";
 import { ReconnectGuard } from "../../../components/ReconnectGuard";
 import { Badge, BottomSheet, Button, useConfirm } from "../../../components/ui";
+import { RoomShare } from "../../../components/RoomShare";
+import { DemoGuide } from "../../../components/DemoGuide";
 import { roomOptions } from "../../../lib/lkOptions";
+
+const DEMO_GUIDE_SEEN_KEY = "ml-demo-guide-seen";
+
+/** 데모 자동 호스트 닉네임(익명, 사람 눈에 구분 가능한 짧은 접미). */
+function demoNickname(): string {
+  return `데모호스트-${Math.floor(1000 + Math.random() * 9000)}`;
+}
 
 type Step = "setup" | "prejoin" | "live";
 
@@ -79,35 +88,88 @@ export default function BroadcastPage() {
   const [invite, setInvite] = useState<string>("");
   const [choices, setChoices] = useState<LocalUserChoices | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const demoStarted = useRef(false);
 
   const confirm = useConfirm();
   const isMobile = useIsMobile();
   const warnNicks = useAudioAlerts(stage === "live" ? roomId : "");
 
-  const start = useCallback(async () => {
-    setBusy(true);
-    setError("");
-    try {
-      await ensureSession(nickname.trim() || "호스트");
-      const room = await apiCreateRoom({
+  /**
+   * 방 생성 공통 경로 — 버튼(수동)과 데모 자동 진입이 공유한다.
+   * demo=true 면 장치 선택(prejoin)을 건너뛰고 바로 live(방문자 첫 접점을 최소 클릭으로).
+   */
+  const createAndEnter = useCallback(
+    async (opts: { nickname: string; title: string; demo: boolean }) => {
+      setBusy(true);
+      setError("");
+      try {
+        await ensureSession(opts.nickname);
+        const room = await apiCreateRoom({
+          title: opts.title,
+          maxGuests: 8,
+          viewerMode,
+        });
+        const tok = await apiIssueToken(room.id);
+        const inv = await apiCreateInvite(room.id);
+        setRoomId(room.id);
+        setMaxGuests(room.maxGuests);
+        setMaxSpeakers(room.maxSpeakers);
+        setToken(tok.token);
+        setInvite(inv.code);
+        if (opts.demo) {
+          // 새로고침 시 ?demo=1 로 방이 또 생기는 것을 차단 — URL 에서 쿼리 제거.
+          // (history 교체만; Next 내비게이션/리렌더를 유발하지 않는다.)
+          if (typeof window !== "undefined")
+            window.history.replaceState(null, "", "/broadcast");
+          // 세션당 1회 가이드.
+          const seen =
+            typeof window !== "undefined" &&
+            window.sessionStorage.getItem(DEMO_GUIDE_SEEN_KEY);
+          if (!seen) setShowGuide(true);
+          setStage("live");
+        } else {
+          setStage("prejoin");
+        }
+      } catch {
+        setError("방을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
+        demoStarted.current = false; // 데모 자동 진입 실패 시 재시도 허용
+      } finally {
+        setBusy(false);
+      }
+    },
+    [viewerMode],
+  );
+
+  const start = useCallback(
+    () =>
+      createAndEnter({
+        nickname: nickname.trim() || "호스트",
         title: title.trim() || "라이브",
-        maxGuests: 8,
-        viewerMode,
-      });
-      const tok = await apiIssueToken(room.id);
-      const inv = await apiCreateInvite(room.id);
-      setRoomId(room.id);
-      setMaxGuests(room.maxGuests);
-      setMaxSpeakers(room.maxSpeakers);
-      setToken(tok.token);
-      setInvite(inv.code);
-      setStage("prejoin");
-    } catch {
-      setError("방을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
-    } finally {
-      setBusy(false);
-    }
-  }, [nickname, title, viewerMode]);
+        demo: false,
+      }),
+    [nickname, title, createAndEnter],
+  );
+
+  // 데모 자동 진입(?demo=1). mount-once ref 로 StrictMode 이중 실행·재렌더 중복 생성 방어.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isDemo =
+      new URLSearchParams(window.location.search).get("demo") === "1";
+    if (!isDemo || demoStarted.current) return;
+    demoStarted.current = true;
+    void createAndEnter({
+      nickname: demoNickname(),
+      title: "데모 라이브",
+      demo: true,
+    });
+  }, [createAndEnter]);
+
+  const dismissGuide = useCallback(() => {
+    if (typeof window !== "undefined")
+      window.sessionStorage.setItem(DEMO_GUIDE_SEEN_KEY, "1");
+    setShowGuide(false);
+  }, []);
 
   const end = useCallback(async () => {
     const ok = await confirm({
@@ -231,6 +293,7 @@ export default function BroadcastPage() {
             <div style={{ marginTop: 12 }}>
               <ControlBar variation="minimal" />
             </div>
+            <RoomShare roomId={roomId} code={invite} />
           </div>
           {!isMobile && (
             <aside className="host-side">
@@ -270,6 +333,7 @@ export default function BroadcastPage() {
         issueToken={async () => (await apiIssueToken(roomId)).token}
         onToken={setToken}
       />
+      {showGuide && <DemoGuide onClose={dismissGuide} />}
     </LiveKitRoom>
   );
 }

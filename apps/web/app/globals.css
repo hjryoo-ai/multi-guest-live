@@ -315,3 +315,97 @@ button {
       color-mix(in srgb, var(--brand) calc(var(--glow) * 100%), var(--border));
   }
 }
+
+/* ── §7-lite 데모 UX: 랜딩 배너 · QR 공유 · 1회성 가이드 ───────────── */
+@keyframes ml-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 랜딩 데모 배너(NEXT_PUBLIC_DEMO_MODE 켜졌을 때만 렌더). */
+.demo-banner {
+  margin-top: 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface));
+}
+.demo-banner .btn {
+  margin-top: 12px;
+}
+.demo-banner .demo-notice {
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* QR 공유(호스트 라이브). 2칸 그리드, 좁은 화면에선 1칸. */
+.room-share {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 520px) {
+  .room-share {
+    grid-template-columns: 1fr;
+  }
+}
+.qr-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.qr-frame {
+  background: #ffffff; /* QR 대비 확보 — 스캔 신뢰성 위해 흰 배경 고정 */
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  line-height: 0;
+}
+.qr-label {
+  font-weight: 600;
+  font-size: 14px;
+}
+.qr-hint {
+  font-size: 12px;
+}
+
+/* 1회성 가이드 오버레이. 애니메이션은 위 reduced-motion 블록이 자동 무력화. */
+.demo-guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--overlay);
+  animation: ml-fade-in 160ms ease-out;
+}
+.demo-guide-card {
+  max-width: 420px;
+  width: 100%;
+  padding: 22px 22px 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: ml-toast-in 180ms ease-out;
+}
+.demo-guide-steps {
+  margin: 12px 0 18px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.demo-guide-steps strong {
+  color: var(--text);
+}

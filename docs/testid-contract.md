@@ -56,6 +56,21 @@
 
 > 신규 testid 는 기존 계약을 침범하지 않으며, 모바일 스모크(390×844) 3종이 이를 사용한다.
 
+## 6. §7-lite 데모 UX testid (신규 · 동일 커밋 반영)
+
+| testid | 위치(컴포넌트) | 동반 속성 | 사용처(spec/helper) |
+|---|---|---|---|
+| `demo-start` | 랜딩 데모 배너의 "데모 시작"(app/page.tsx, `NEXT_PUBLIC_DEMO_MODE` 시에만 렌더) | — (링크 `/broadcast?demo=1`) | 수동/스크린샷 (모바일 스모크는 URL 직행이라 미의존) |
+| `qr-guest` | 호스트 라이브 QR 공유 — 게스트 진입(RoomShare) | `data-url` | phase7-demo-mobile |
+| `qr-viewer` | 호스트 라이브 QR 공유 — 시청자 진입(RoomShare) | `data-url` | phase7-demo-mobile |
+| `guide-overlay` | 데모 1회성 가이드 오버레이(DemoGuide, 세션당 1회) | `role="dialog"` | phase7-demo-mobile |
+| `guide-dismiss` | 가이드 "시작하기"(닫기) | — | phase7-demo-mobile |
+
+> `demo-start` 노출은 **표시 플래그**(`NEXT_PUBLIC_DEMO_MODE`) 종속이지만, 데모 **플로우**는 `?demo=1`
+> URL 로 구동되어 표시 플래그와 무관하다 — 그래서 모바일 스모크는 배너를 거치지 않고 `/broadcast?demo=1`
+> 로 직행해 게이트를 빌드 플래그에 묶지 않는다. QR 컨테이너 div 는 동기 렌더(내부 SVG 만 동적 로드)라
+> `toBeVisible` 이 즉시 성립한다.
+
 ## 5. Phase 6.6 에서 변경된 계약(동일 커밋 반영 완료)
 
 호스트 채팅이 우측 패널의 **채팅 탭**(기본 비활성, `요청` 탭이 기본)으로 이동했다. host 채팅을
