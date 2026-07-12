@@ -15,6 +15,8 @@
 증가분(≤2 kB/route)은 신규 컴포넌트(DevicePreview·MediaFrame·HostPanel·상태 셸) 대비 미미.
 hls.js(약 −155 kB)의 lazy 분리(6.5 B-4 이관분)는 유지된다.
 
+> **기준선 이동 — Next 15 업그레이드(#2) 이후**: `/watch` **280 kB** · `/join`·`/broadcast` 284 kB · shared **102 kB**(87.3→102). 증가분(~+15 kB)은 라우트 코드가 아니라 **Next 15 shared 런타임**에서 발생(route별 코드는 3.3~4.6 kB로 유지) — 코드 리그레션이 아닌 프레임워크 고정비용. **이후 PR의 번들 비교 기준선은 이 수치(watch 280 kB)를 쓴다.**
+
 ## 2. 레벨미터/글로우 링 리렌더 = 0 (설계 성질)
 
 스펙 §6 "볼륨 틱당 React commit 0" 은 **측정이 아니라 구조로 보장**한다:

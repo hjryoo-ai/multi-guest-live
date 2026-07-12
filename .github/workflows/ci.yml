@@ -1,6 +1,6 @@
 name: CI
 
-# PR 게이트: typecheck → 인프라 → verify(1~6b + 6.5 a/b/c) → Playwright E2E 11게이트.
+# PR 게이트: typecheck → 인프라 → verify(1~6b + 6.5 a/b/c) → Playwright E2E 14게이트(핵심 11 + 모바일 스모크 3).
 # 부하테스트/8명 전수/egress 스모크는 여기 없음 → nightly.yml.
 on:
   pull_request:
@@ -89,7 +89,7 @@ jobs:
       - name: web 빌드(next start 용)
         run: pnpm --filter @multi-live/web build
 
-      - name: E2E 게이트 (phase2/3/4/6 + HLS 픽스처 + 6.5 신호 스푸핑, 총 11)
+      - name: E2E 게이트 (핵심 11 + 모바일 스모크 3 = 총 14 · @heavy/screenshots 제외)
         # WebRTC 첫 테스트 콜드스타트 flake 대비 CI 한정 1회 재시도(로컬 설정은 retries:0 유지).
         run: pnpm --filter @multi-live/web exec playwright test --retries=1
 

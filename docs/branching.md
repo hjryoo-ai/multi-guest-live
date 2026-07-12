@@ -22,6 +22,8 @@ main ──────●───────●───────●──
 - **Required status check: `gate`** — CI 워크플로(`.github/workflows/ci.yml`)의 job id 가 `gate` 다. (워크플로 name 은 `CI`, 체크 표시명은 `CI / gate`.) required 로 거는 대상은 워크플로 이름이 아니라 **job 이름 `gate`**.
 - `enforce_admins: true` — 1인 프로젝트라도 관리자 본인도 게이트를 우회하지 않는다(§7 서사와 일관, hotfix 예외 없음 원칙과도 일관).
 - 리뷰어 요구는 걸지 않음(1인) — 대신 **CI 그린 = 머지 조건**을 기계로 강제.
+- **게이트 정의(수치 정본)**: `gate` = typecheck(전체) + verify 1~6.5 + **Playwright E2E 14개** = 핵심 11 + 모바일 스모크 3종(390×844). `@heavy`(8명 전수·egress·reconnect)와 `screenshots.spec`은 게이트 제외(→ `nightly.yml`). **이 14가 수치 정본**이며 ci.yml 스텝 라벨·PR 본문 수치는 여기에 맞춘다(라벨 드리프트 방지).
+- **보고 수치의 출처 = 실행 로그**: "N/N 통과" 보고는 반드시 **CI 실행 로그의 passed 카운트**에서 읽는다 — 스텝 *이름*·주석·문서 라벨이 아니라. 라벨·문서·보고가 서로 어긋나면 **CI 로그가 정본**이고, 어긋난 라벨은 즉시 정정한다.
 
 설정 명령(레포 push 후 1회, PR #1 머지 직후 활성화):
 
@@ -47,7 +49,7 @@ JSON
 `.github/PULL_REQUEST_TEMPLATE.md` 의 3개 항목 필수:
 
 1. **변경**: 무엇을 왜 (설계문서 § 참조)
-2. **검증**: 통과한 verify/E2E 스코프 (예: "E2E 11/11, verify 1~6.5 그린")
+2. **검증**: 통과한 verify/E2E 스코프 (예: "E2E 14/14, verify 1~6.5 그린")
 3. **계약 영향**: testid·에러코드·API 계약·env 변경 여부 — 있으면 계약 문서(`docs/testid-contract.md` 등) 갱신을 **같은 PR**에 포함
 
 DB 마이그레이션 포함 PR은 제목에 `[migration]` 표기. 마이그레이션은 **expand-only(backward-compatible)** 만 — 컬럼 drop/rename 을 배포와 같은 PR에 넣지 않는다(배포 중 구버전 코드가 잠깐 공존).
