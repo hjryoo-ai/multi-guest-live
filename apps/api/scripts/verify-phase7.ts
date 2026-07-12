@@ -135,7 +135,11 @@ async function main() {
       AUTH_SECRET: "x".repeat(40),
       LIVEKIT_API_SECRET: "y".repeat(40),
       LIVEKIT_API_KEY: "prodkey",
-      CORS_ORIGINS: "http://localhost:3000",
+      CORS_ORIGINS: "https://app.example.com",
+      // §7-lite 1-2: 프로덕션 부트는 self-host/dev URL 을 거부하므로 Cloud(TLS) 주소 명시.
+      LIVEKIT_URL: "https://demo.livekit.cloud",
+      NEXT_PUBLIC_LIVEKIT_URL: "wss://demo.livekit.cloud",
+      NEXT_PUBLIC_API_URL: "https://api.example.com",
       TRUST_PROXY: "", // 명시적 미신뢰(직결)
     });
 
