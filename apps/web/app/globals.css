@@ -335,6 +335,8 @@ button {
   background: color-mix(in srgb, var(--brand) 12%, var(--surface));
 }
 .demo-banner .btn {
+  /* 앵커(<a>)는 기본 inline 이라 margin-top·박스가 먹지 않아 위 문단과 겹친다 → inline-block. */
+  display: inline-block;
   margin-top: 12px;
 }
 .demo-banner .demo-notice {
