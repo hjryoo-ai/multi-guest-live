@@ -25,9 +25,16 @@ api.example.com {
 	}
 
 	encode zstd gzip
-	# LiveKit webhook·HLS 세그먼트가 이 도메인을 지난다면 body/timeout 은 기본값으로 충분.
 }
 ```
+
+## 웹훅 (LiveKit Cloud 대시보드 등록)
+
+Cloud 대시보드의 webhook URL 은 `https://api.<도메인>/webhooks/livekit` 로 등록한다.
+서명 검증이 **raw body 바이트**에 의존하므로(`addContentTypeParser` 로 원문 보존), **프록시가 요청
+body 를 변형하면 안 된다**. Caddy `reverse_proxy` 는 기본적으로 body 를 무변형 전달하므로 별도 설정
+불필요 — 단, body 를 건드리는 미들웨어(재작성·버퍼링 변환 등)를 이 경로에 추가하지 말 것.
+`encode`(응답 압축)는 요청 body 와 무관하므로 서명 검증에 영향 없다.
 
 ## 앱측 설정 (VPS env)
 
