@@ -1,0 +1,8 @@
+# CI 오버라이드 — `docker compose -f docker-compose.yml -f docker-compose.ci.yml ...`
+# 리눅스 러너에서 LiveKit 이 CI 설정을 쓰고, 도커→호스트(api) 도달을 위해 host-gateway 매핑.
+services:
+  livekit:
+    volumes:
+      - ./livekit.ci.yaml:/etc/livekit.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,0 +1,83 @@
+name: Nightly
+
+# 비용·flaky 부담이 큰 검증을 게이트에서 분리해 야간 실행(보고용).
+#   - @heavy 8명 전수 오디오 도달
+#   - egress 스모크(실 컨테이너, 러너 환경상 실패 가능 → continue-on-error)
+#   - 축소 부하(시청자 30, continue-on-error). 정식 부하(8+100)는 로컬 리포트로 산출.
+on:
+  schedule:
+    - cron: "0 18 * * *" # 매일 03:00 KST
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  heavy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: env 파일 준비
+        run: |
+          cp .env.example .env
+          cp .env.example apps/api/.env
+      - name: 인프라 + egress 기동
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            up -d livekit redis postgres egress
+      - name: 인프라 헬스 대기
+        run: |
+          for i in $(seq 1 30); do
+            docker compose exec -T postgres pg_isready -U multilive && \
+            docker compose exec -T redis redis-cli ping && break
+            sleep 2
+          done
+      - run: pnpm --filter @multi-live/api db:migrate
+      - name: API 기동(백그라운드)
+        run: |
+          nohup pnpm --filter @multi-live/api dev > /tmp/api.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:4000/health && break; sleep 2; done
+      - name: Playwright 브라우저 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm --filter @multi-live/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @multi-live/web build
+
+      - name: 전수 오디오 도달 @heavy (8명 + speaker 혼합)
+        env:
+          HEAVY: "1"
+        run: pnpm --filter @multi-live/web exec playwright test phase3 phase6a --retries=1
+
+      - name: egress 스모크 (보고용)
+        continue-on-error: true
+        env:
+          HEAVY: "1"
+        run: pnpm --filter @multi-live/web exec playwright test egress-smoke
+
+      - name: 축소 부하 (시청자 30, 보고용)
+        continue-on-error: true
+        run: bash scripts/loadtest.sh --subscribers 30 --report /tmp/loadtest-nightly.md
+
+      - name: 아티팩트 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-artifacts
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            /tmp/loadtest-nightly.md
+            /tmp/api.log
+          retention-days: 7

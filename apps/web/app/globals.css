@@ -1,0 +1,317 @@
+/* Pretendard (국문 본문) — 실패 시 시스템 폰트로 우아하게 폴백(네트워크 비의존). */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+
+/*
+ * Phase 6.6 디자인 토큰 — 아티스트 라이브 팬 플랫폼(다크 몰입 + 피어리스 블루).
+ * 토큰은 [data-theme] 에 정의 → 향후 라이트/아티스트 스킨은 토큰 세트 교체만으로.
+ * 하드코딩 색·간격 금지: 컴포넌트는 아래 변수만 참조.
+ */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* 배경·표면 (H≈214° 딥 네이비 블랙, 순흑 금지) */
+  --bg: #0a0e16;
+  --surface: #131a26;
+  --surface-2: #1b2536;
+  --border: #26314a;
+  --overlay: rgba(6, 10, 20, 0.72); /* 영상 위 오버레이 */
+
+  /* 텍스트 (한색 계열) */
+  --text: #f2f5f9;
+  --text-muted: #9ba8bc;
+
+  /* 브랜드 — 피어리스 블루 (Pantone 7453C) */
+  --brand: #7ba6de;
+  --brand-strong: #5b8ccb;
+  --brand-soft: #aecbef;
+  --brand-on: #06101f; /* 브랜드 배경 위 텍스트(대비 확보) */
+  --brand-glow: rgba(123, 166, 222, 0.55); /* 글로우 링 기본 */
+
+  /* 기능색 */
+  --live: #ff4d5e; /* LIVE/온에어 — 색 관례(레드) 유지 */
+  --warn: #ffb020; /* 오디오 경고 */
+  --ok: #3dd68c; /* 연결 정상 */
+  --danger: #ff5c6c; /* 파괴적 액션(강퇴/차단/종료) */
+  --danger-soft: #ff9ba4;
+
+  /* 형태 토큰 */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --gap: 12px;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+
+  /* 모션 */
+  --dur: 160ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--brand);
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* 키보드 접근성: 전 인터랙션에 가시 포커스 링(brand). */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 숫자(시청자 수·타이머)는 tabular-nums 로 폭 고정(카운터 튀지 않게). */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+/* ── 공용 유틸(토큰 참조) ──────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.btn {
+  background: var(--brand);
+  color: var(--brand-on);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-weight: 600;
+  transition:
+    background var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+.btn:hover:not(:disabled) {
+  background: var(--brand-soft);
+}
+.btn:active:not(:disabled) {
+  background: var(--brand-strong);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+/* 시그니처 글로우 링 — 레이아웃 시프트 없이 box-shadow/outline 만.
+ * --glow(0~1) 를 rAF 로 갱신하면 React 리렌더 없이 스타일만 바뀐다(Track D). */
+.glow {
+  --glow: 0;
+  outline: 1px solid
+    color-mix(in srgb, var(--brand) calc(var(--glow) * 100%), var(--border));
+  box-shadow: 0 0 calc(2px + var(--glow) * 16px) var(--brand-glow);
+  transition: outline-color var(--dur) linear;
+}
+
+/* ── 시청자 레이아웃(모바일 우선) ─────────────────────────────
+ * 모바일: 100dvh 세로 스택(영상 → 채팅 flex). 주소창 수축엔 dvh, 홈 인디케이터엔 safe-area.
+ * 데스크톱(≥900px): 2단(영상 좌 · 채팅 우 340px). 컨테이너 max-width 로 정렬. */
+.watch-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+}
+.watch-media {
+  position: relative;
+  width: 100%;
+  background: #000;
+  flex: 0 0 auto;
+}
+.watch-media > video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+/* WebRTC 스테이지는 타일 그리드 — 모바일에선 상단 영역만 차지하고 내부 스크롤. */
+.watch-stage {
+  max-height: 42dvh;
+  overflow-y: auto;
+  padding: 10px;
+}
+.watch-chat {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* 영상 위 오버레이(LIVE · 시청자 수) — 탭 토글, 레이아웃 비침습. */
+.watch-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+  z-index: 2;
+}
+.watch-overlay[data-show="false"] {
+  opacity: 0;
+}
+.watch-overlay > * {
+  pointer-events: auto;
+}
+@media (min-width: 900px) {
+  .watch-shell {
+    flex-direction: row;
+    max-width: 1280px;
+    margin: 0 auto;
+    gap: 16px;
+    padding: 16px;
+    align-items: stretch;
+  }
+  .watch-media {
+    flex: 1 1 auto;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .watch-media > video {
+    border-radius: var(--radius);
+  }
+  .watch-stage {
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    width: 100%;
+  }
+  .watch-chat {
+    flex: 0 0 340px;
+  }
+}
+
+/* 호스트 대시보드 — 데스크톱 우선(2단), 모바일은 스테이지 + 바텀시트 패널. */
+.host-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.host-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.host-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+@media (min-width: 900px) {
+  .host-body {
+    grid-template-columns: 1fr 360px;
+    align-items: start;
+  }
+  .host-side {
+    height: calc(100dvh - 150px);
+    position: sticky;
+    top: 16px;
+    min-height: 0;
+  }
+}
+
+/* 게스트 입장 전(장치 프리뷰 + 폼) — 모바일 스택, 데스크톱 2단. */
+.join-entry {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 760px) {
+  .join-entry {
+    grid-template-columns: 1fr 300px;
+    align-items: start;
+  }
+}
+
+/* ── 공용 컴포넌트 지원(키프레임·스켈레톤) ─────────────────── */
+@keyframes ml-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes ml-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes ml-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 25%,
+    var(--surface-2) 37%,
+    var(--surface) 63%
+  );
+  background-size: 200% 100%;
+  animation: ml-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* 글로우 링: 발광 애니메이션 대신 정적 테두리 색 변화로 대체(발광 강도 고정). */
+  .glow {
+    box-shadow: none;
+    outline: 2px solid
+      color-mix(in srgb, var(--brand) calc(var(--glow) * 100%), var(--border));
+  }
+}

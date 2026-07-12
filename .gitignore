@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.next/
+out/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+coverage/
+playwright-report/
+test-results/
+.turbo/
+pgdata/
+
+# 런타임 산출물
+egress-out/

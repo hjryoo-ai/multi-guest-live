@@ -1,0 +1,105 @@
+name: CI
+
+# PR 게이트: typecheck → 인프라 → verify(1~6b + 6.5 a/b/c) → Playwright E2E 11게이트.
+# 부하테스트/8명 전수/egress 스모크는 여기 없음 → nightly.yml.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 같은 ref 의 이전 실행은 취소(중복 러너 낭비 방지).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm # pnpm store 캐시
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: env 파일 준비
+        run: |
+          cp .env.example .env
+          cp .env.example apps/api/.env
+
+      - name: 인프라 기동 (CI 오버라이드)
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            up -d livekit redis postgres
+
+      - name: 인프라 헬스 대기
+        run: |
+          for i in $(seq 1 30); do
+            docker compose exec -T postgres pg_isready -U multilive && \
+            docker compose exec -T redis redis-cli ping && \
+            curl -sf http://localhost:7880 >/dev/null 2>&1 && break
+            sleep 2
+          done
+
+      - name: 타입체크(전체)
+        run: pnpm -r typecheck
+
+      # 신선한 postgres 컨테이너 = 초기화된 DB (매 실행 클린). 마이그레이션만 적용.
+      - name: DB 마이그레이션
+        run: pnpm --filter @multi-live/api db:migrate
+
+      - name: API 기동(백그라운드)
+        run: |
+          nohup pnpm --filter @multi-live/api dev > /tmp/api.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4000/health && break
+            sleep 2
+          done
+
+      - name: 서버 검증 (verify 1~6b + 6.5 하드닝 a/b/c)
+        run: |
+          pnpm --filter @multi-live/api verify:phase1
+          pnpm --filter @multi-live/api verify:phase2
+          pnpm --filter @multi-live/api verify:phase3
+          pnpm --filter @multi-live/api verify:phase4
+          pnpm --filter @multi-live/api verify:phase5
+          pnpm --filter @multi-live/api verify:phase6a
+          pnpm --filter @multi-live/api verify:phase6b
+          pnpm --filter @multi-live/api verify:phase65a
+          pnpm --filter @multi-live/api verify:phase65b
+          pnpm --filter @multi-live/api verify:phase65c
+
+      - name: Playwright 브라우저 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Playwright 설치
+        run: pnpm --filter @multi-live/web exec playwright install --with-deps chromium
+
+      - name: web 빌드(next start 용)
+        run: pnpm --filter @multi-live/web build
+
+      - name: E2E 게이트 (phase2/3/4/6 + HLS 픽스처 + 6.5 신호 스푸핑, 총 11)
+        # WebRTC 첫 테스트 콜드스타트 flake 대비 CI 한정 1회 재시도(로컬 설정은 retries:0 유지).
+        run: pnpm --filter @multi-live/web exec playwright test --retries=1
+
+      - name: 실패 시 trace/report 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            /tmp/api.log
+          retention-days: 7

@@ -1,0 +1,40 @@
+# LiveKit SFU 개발용 설정
+# 프로덕션에서는 keys 를 반드시 교체하고 TLS/turn 을 구성할 것.
+port: 7880
+bind_addresses:
+  - ""
+
+rtc:
+  # 개발 편의를 위해 단일 UDP 포트 사용 (docker-compose 포트 매핑과 일치)
+  udp_port: 7882
+  tcp_port: 7881
+  use_external_ip: false
+  # Docker Desktop(Mac) 로컬 개발: 컨테이너 내부 IP 대신 호스트에서 도달 가능한
+  # 127.0.0.1 을 ICE 후보로 광고 → 브라우저가 포트매핑(7882/udp, 7881/tcp)으로 미디어 연결.
+  node_ip: "127.0.0.1"
+
+redis:
+  address: redis:6379
+
+# API key/secret — apps/api 의 .env 와 반드시 일치해야 함
+keys:
+  devkey: devsecret_change_me_0123456789abcdef
+
+# 백엔드로 참가자/트랙 이벤트를 전달 (Phase 1 webhook 동기화용)
+webhook:
+  api_key: devkey
+  urls:
+    # docker 네트워크 밖(호스트)에서 api 가 뜰 때
+    - http://host.docker.internal:4000/webhooks/livekit
+
+# Prometheus 자체 메트릭 노출(Phase 5). 스크레이프: curl localhost:6789/metrics
+prometheus_port: 6789
+
+logging:
+  level: info
+  json: false
+
+room:
+  # 마지막 참가자 퇴장 후 방 자동 종료까지 유예(초)
+  empty_timeout: 300
+  max_participants: 0 # 0 = 무제한 (앱 레벨에서 max_guests 로 제한)

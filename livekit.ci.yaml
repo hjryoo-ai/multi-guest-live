@@ -1,0 +1,33 @@
+# LiveKit SFU — CI(리눅스 러너)용 오버라이드.
+# 로컬(Mac)과 분리해 환경 의존 이슈를 격리한다(Mac node_ip 문제 전례 반영).
+port: 7880
+bind_addresses:
+  - ""
+
+rtc:
+  udp_port: 7882
+  tcp_port: 7881
+  use_external_ip: false
+  # 러너 호스트의 Playwright Chromium 이 매핑 포트(127.0.0.1:7882/udp)로 미디어 연결.
+  node_ip: "127.0.0.1"
+
+redis:
+  address: redis:6379
+
+keys:
+  devkey: devsecret_change_me_0123456789abcdef
+
+webhook:
+  api_key: devkey
+  urls:
+    # api 는 러너 호스트(도커 밖)에서 :4000 으로 뜬다. 리눅스 도커는 host.docker.internal 을
+    # 기본 제공하지 않으므로 compose 오버라이드의 extra_hosts(host-gateway)로 매핑한다.
+    - http://host.docker.internal:4000/webhooks/livekit
+
+logging:
+  level: info
+  json: false
+
+room:
+  empty_timeout: 300
+  max_participants: 0

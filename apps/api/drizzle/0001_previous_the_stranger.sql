@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS "room_participants_room_user_idx";--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "room_participants_room_user_uniq" ON "room_participants" USING btree ("room_id","user_id");

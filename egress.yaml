@@ -1,0 +1,15 @@
+# LiveKit Egress 개발용 설정 (모드 B: Room Composite → HLS 세그먼트).
+# egress 는 headless Chrome 으로 방에 숨은 참가자로 입장해 렌더링 → /out 에 .m3u8/.ts 를 쓴다.
+# redis 를 LiveKit 서버와 공유해 egress 요청을 수신하고, 상태를 서버 webhook 으로 보고.
+redis:
+  address: redis:6379
+
+api_key: devkey
+api_secret: devsecret_change_me_0123456789abcdef
+
+# egress 컨테이너 → LiveKit 서버(도커 네트워크 내부 주소).
+ws_url: ws://livekit:7880
+insecure: true
+
+# 로컬 파일 출력 루트(호스트 ./egress-out 와 공유 볼륨).
+log_level: info

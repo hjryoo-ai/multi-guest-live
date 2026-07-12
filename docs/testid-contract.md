@@ -1,0 +1,64 @@
+# E2E 테스트 계약 (testid / 셀렉터) — Phase 6.6 이전 고정본
+
+> **이 패스의 최우선 규칙(6.6 §5).** UI 개편이 아래 계약을 조용히 깨는 것이 최대 리스크다.
+> 마크업을 바꿔도 아래 앵커는 **반드시 보존·이동**한다. 불가피하게 텍스트/역할 라벨을 바꾸면
+> `e2e/helpers.ts` + 해당 spec 을 **동일 커밋**에서 고쳐야 하며 완료 보고에 명시한다.
+> 추출 시점: Phase 6.6 시작 전(Phase 6.5 완료 상태). E2E 게이트 = 11개 스펙(회귀 기준).
+
+## 1. `data-testid` (보존 필수)
+
+| testid | 위치(컴포넌트) | 동반 속성 | 사용처(spec/helper) |
+|---|---|---|---|
+| `invite` | 방 생성 후 초대 카드 (broadcast) | `data-room-id`, `data-code` | createHost — roomId·code 추출 |
+| `tile` | Stage 참가자 타일 | `data-nick` | phase3/6a, remoteVideoCount, kick |
+| `speaker-chip` | speaker 스트립 아바타 | `data-nick`(권장) | phase6a |
+| `viewer-count` | 시청자 수 배지 | — | phase4 |
+| `hls-video` | HlsPlayer `<video>` | `data-hls-state`=`idle\|parsed\|error` | phase4-hls-player |
+| `chat-msg` | 채팅 메시지 행 | `data-msg-id`, `data-hidden`=`0\|1` | phase4/6b/65a |
+| `chat-banned` | 채팅 차단 안내 | — | phase6b |
+| `duplicate-banner` | ReconnectGuard 중복 접속 | — | phase5-reconnect(있으면) |
+| `reconnect-manual` | ReconnectGuard 수동 재접속 | — | phase5-reconnect |
+
+## 2. 텍스트/역할/placeholder 셀렉터 (보존 또는 동일 커밋 수정)
+
+**Placeholder** (`getByPlaceholder`): `호스트` · `게스트` · `시청자` · `메시지 입력`
+
+**버튼** (`getByRole("button", { name })`):
+`방 만들기` · `입장` · `대기실 입장` · `시청 입장` · `게스트로 승인` · `스피커로 승인` · `거절` ·
+`강퇴`(타일 내) · `숨기기`(채팅) · `게스트로`(speaker chip→guest) · `스피커로`(tile→speaker) · `다시 접속`(reconnect-manual)
+
+**콤보박스**: `getByRole("combobox").selectOption("hls")` — broadcast 모드 선택(value=`hls`/`webrtc`)
+
+**텍스트** (`getByText`): `🎙️ 출연 중`(guest 승격) · `🎙 음성 참여 중`(speaker 승격)
+
+## 3. 런타임 훅
+
+- `window.__lkRoom` — `AudioReach` 가 `useRoomContext()` room 을 노출(E2E 구독상태 introspection). **보존 필수.**
+
+## 4. Phase 6.6 신규 상태 화면 testid (후속 E2E·모바일 스모크용 신규 부여)
+
+| testid | 화면/상태 |
+|---|---|
+| `state-loading` | 공통 셸 로딩(스켈레톤 컨테이너) |
+| `state-error` | 공통 셸 에러(원인+재시도) |
+| `state-ended` | 방송 종료 화면 |
+| `state-removed` | 강퇴 안내(재요청 경로) — **구현됨(6.6 Guest)**. `phase3` 강퇴 시나리오가 강퇴된 쪽 가시성 검증 |
+| `device-preview` | guest 장치 프리뷰 — **구현됨(6.6 Guest)** |
+| `waiting-room` | guest 대기실 — **구현됨(6.6 Guest)**. 승격되면 이 testid 는 사라지고 상태 pill 이 `🎙️ 출연 중`/`🎙 음성 참여 중` 노출(기존 승격 신호 보존) |
+| ~~`approval-toast`~~ | 승인 모먼트는 **공용 `toast` testid** 로 통일(별도 testid 미부여). guest 모바일 스모크가 `toast` 가시성으로 검증 |
+| `chat-input` | 채팅 입력창(비활성 상태 판별) — **구현됨(6.6 Viewer)**. placeholder `메시지 입력` 병존 유지 |
+| `chat-jump` | "새 메시지 ↓" 점프 배지 — **구현됨(6.6 Viewer)** |
+| `chat-retry` | 전송 실패 재시도 버튼(`↻ 다시 보내기`) — **구현됨(6.6 Viewer)** |
+| `host-panel` | host 우측 패널(참가자/요청/채팅 탭) — **구현됨(6.6 Host)**. 탭은 `role="tab"` (`참가자 N` / `요청` / `채팅`), 기본 활성 = `요청` |
+| `host-panel-sheet` | 모바일 host 하단 시트 — **구현됨(6.6 Host)**. 좁은 화면(<900px)에서 `관리` 버튼으로 오픈 |
+| `confirm-dialog` | 파괴적 액션 컨펌 — 구현됨 |
+| `toast` | 토스트(성공/실패/정보) — 구현됨 |
+
+> 신규 testid 는 기존 계약을 침범하지 않으며, 모바일 스모크(390×844) 3종이 이를 사용한다.
+
+## 5. Phase 6.6 에서 변경된 계약(동일 커밋 반영 완료)
+
+호스트 채팅이 우측 패널의 **채팅 탭**(기본 비활성, `요청` 탭이 기본)으로 이동했다. host 채팅을
+조작하는 스펙은 먼저 채팅 탭을 열어야 한다 → `helpers.openHostChat(page)` = `getByRole("tab",{name:"채팅"}).click()`.
+반영된 스펙: `phase4`(승인 후), `phase65a`(승인 후), `phase6b`(생성 직후). kick 은 타일 버튼이라 무관.
+탭은 display 토글(상시 마운트)이라 전환·폴링에도 채팅/큐 상태가 보존된다.
