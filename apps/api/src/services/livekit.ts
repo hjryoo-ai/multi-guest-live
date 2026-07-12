@@ -9,6 +9,7 @@ import {
   type WebhookEvent,
 } from "livekit-server-sdk";
 import { config } from "../config.js";
+import { withLivekitTimeout } from "../lib/livekitTimeout.js";
 import {
   ROLE_GRANTS,
   DATA_TOPICS,
@@ -43,17 +44,23 @@ export async function createLiveKitRoom(
   roomId: string,
   maxGuests: number,
 ): Promise<void> {
-  await roomService.createRoom({
-    name: livekitRoomName(roomId),
-    emptyTimeout: 300,
-    // host(1) + guest(maxGuests) + viewer 여유분
-    maxParticipants: 1 + maxGuests + 200,
-  });
+  await withLivekitTimeout(
+    roomService.createRoom({
+      name: livekitRoomName(roomId),
+      emptyTimeout: 300,
+      // host(1) + guest(maxGuests) + viewer 여유분
+      maxParticipants: 1 + maxGuests + 200,
+    }),
+    "createRoom",
+  );
 }
 
 export async function deleteLiveKitRoom(roomId: string): Promise<void> {
   try {
-    await roomService.deleteRoom(livekitRoomName(roomId));
+    await withLivekitTimeout(
+      roomService.deleteRoom(livekitRoomName(roomId)),
+      "deleteRoom",
+    );
   } catch (err) {
     // 이미 없는 방은 무시 (멱등).
     console.warn(
@@ -64,7 +71,10 @@ export async function deleteLiveKitRoom(roomId: string): Promise<void> {
 }
 
 export async function listRoomParticipants(roomId: string) {
-  return roomService.listParticipants(livekitRoomName(roomId));
+  return withLivekitTimeout(
+    roomService.listParticipants(livekitRoomName(roomId)),
+    "listParticipants",
+  );
 }
 
 /**
@@ -133,16 +143,22 @@ export async function muteParticipantTrack(
   trackSid: string,
   muted: boolean,
 ) {
-  return roomService.mutePublishedTrack(
-    livekitRoomName(roomId),
-    identity,
-    trackSid,
-    muted,
+  return withLivekitTimeout(
+    roomService.mutePublishedTrack(
+      livekitRoomName(roomId),
+      identity,
+      trackSid,
+      muted,
+    ),
+    "mutePublishedTrack",
   );
 }
 
 export async function removeParticipant(roomId: string, identity: string) {
-  return roomService.removeParticipant(livekitRoomName(roomId), identity);
+  return withLivekitTimeout(
+    roomService.removeParticipant(livekitRoomName(roomId), identity),
+    "removeParticipant",
+  );
 }
 
 /**
@@ -156,12 +172,20 @@ export async function muteParticipantAudio(
   identity: string,
 ): Promise<number> {
   const room = livekitRoomName(roomId);
-  const info = await roomService.getParticipant(room, identity);
+  const info = await withLivekitTimeout(
+    roomService.getParticipant(room, identity),
+    "getParticipant",
+  );
   const audioSids = (info.tracks ?? [])
     .filter((t) => t.type === TrackType.AUDIO)
     .map((t) => t.sid);
   await Promise.all(
-    audioSids.map((sid) => roomService.mutePublishedTrack(room, identity, sid, true)),
+    audioSids.map((sid) =>
+      withLivekitTimeout(
+        roomService.mutePublishedTrack(room, identity, sid, true),
+        "mutePublishedTrack",
+      ),
+    ),
   );
   return audioSids.length;
 }
@@ -171,9 +195,9 @@ export async function getParticipantVideoTrackSids(
   roomId: string,
   identity: string,
 ): Promise<string[]> {
-  const info = await roomService.getParticipant(
-    livekitRoomName(roomId),
-    identity,
+  const info = await withLivekitTimeout(
+    roomService.getParticipant(livekitRoomName(roomId), identity),
+    "getParticipant",
   );
   return (info.tracks ?? [])
     .filter((t) => t.type === TrackType.VIDEO)
@@ -190,12 +214,20 @@ export async function muteParticipantVideo(
   identity: string,
 ): Promise<string[]> {
   const room = livekitRoomName(roomId);
-  const info = await roomService.getParticipant(room, identity);
+  const info = await withLivekitTimeout(
+    roomService.getParticipant(room, identity),
+    "getParticipant",
+  );
   const sids = (info.tracks ?? [])
     .filter((t) => t.type === TrackType.VIDEO)
     .map((t) => t.sid);
   await Promise.all(
-    sids.map((sid) => roomService.mutePublishedTrack(room, identity, sid, true)),
+    sids.map((sid) =>
+      withLivekitTimeout(
+        roomService.mutePublishedTrack(room, identity, sid, true),
+        "mutePublishedTrack",
+      ),
+    ),
   );
   return sids;
 }
@@ -206,16 +238,19 @@ export async function updateParticipantPermission(
   role: Role,
 ) {
   const g = ROLE_GRANTS[role];
-  return roomService.updateParticipant(
-    livekitRoomName(roomId),
-    identity,
-    JSON.stringify({ role }),
-    {
-      canPublish: g.canPublish,
-      canSubscribe: g.canSubscribe,
-      canPublishData: g.canPublishData,
-      canPublishSources: g.audioOnly ? [TrackSource.MICROPHONE] : undefined,
-    },
+  return withLivekitTimeout(
+    roomService.updateParticipant(
+      livekitRoomName(roomId),
+      identity,
+      JSON.stringify({ role }),
+      {
+        canPublish: g.canPublish,
+        canSubscribe: g.canSubscribe,
+        canPublishData: g.canPublishData,
+        canPublishSources: g.audioOnly ? [TrackSource.MICROPHONE] : undefined,
+      },
+    ),
+    "updateParticipant",
   );
 }
 
@@ -229,11 +264,14 @@ export async function sendSignal(
   message: SignalMessage,
 ) {
   const data = new TextEncoder().encode(JSON.stringify(message));
-  await roomService.sendData(livekitRoomName(roomId), data, DataPacket_Kind.RELIABLE, {
-    // 빈 배열 = 전체 브로드캐스트(destinationIdentities 생략).
-    ...(identities.length > 0 ? { destinationIdentities: identities } : {}),
-    topic: DATA_TOPICS.signal,
-  });
+  await withLivekitTimeout(
+    roomService.sendData(livekitRoomName(roomId), data, DataPacket_Kind.RELIABLE, {
+      // 빈 배열 = 전체 브로드캐스트(destinationIdentities 생략).
+      ...(identities.length > 0 ? { destinationIdentities: identities } : {}),
+      topic: DATA_TOPICS.signal,
+    }),
+    "sendData(signal)",
+  );
 }
 
 /**
@@ -245,9 +283,12 @@ export async function sendSignal(
 export async function sendChat(roomId: string, message: ChatMessageDto) {
   const payload = JSON.stringify({ type: "CHAT", message });
   const data = new TextEncoder().encode(payload);
-  await roomService.sendData(livekitRoomName(roomId), data, DataPacket_Kind.RELIABLE, {
-    topic: DATA_TOPICS.chat,
-  });
+  await withLivekitTimeout(
+    roomService.sendData(livekitRoomName(roomId), data, DataPacket_Kind.RELIABLE, {
+      topic: DATA_TOPICS.chat,
+    }),
+    "sendData(chat)",
+  );
 }
 
 /**
@@ -255,7 +296,10 @@ export async function sendChat(roomId: string, message: ChatMessageDto) {
  * (모드 A 전용. numParticipants 는 host/guest 를 포함하므로 순수 시청자만 세려면 차감.)
  */
 export async function countWebrtcViewers(roomId: string): Promise<number> {
-  const parts = await roomService.listParticipants(livekitRoomName(roomId));
+  const parts = await withLivekitTimeout(
+    roomService.listParticipants(livekitRoomName(roomId)),
+    "listParticipants",
+  );
   let viewers = 0;
   for (const p of parts) {
     if (!p.permission?.canPublish) viewers++;

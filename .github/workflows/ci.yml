@@ -1,6 +1,6 @@
 name: CI
 
-# PR 게이트: typecheck → 인프라 → verify(1~6b + 6.5 a/b/c + 7 프록시신뢰·데모가드) → Playwright E2E 14게이트(핵심 11 + 모바일 스모크 3).
+# PR 게이트: typecheck → 인프라 → verify(1~6b + 6.5 a/b/c + 7 프록시신뢰·데모가드·LiveKit타임아웃) → Playwright E2E 14게이트(핵심 11 + 모바일 스모크 3).
 # 부하테스트/8명 전수/egress 스모크는 여기 없음 → nightly.yml.
 on:
   pull_request:
@@ -64,7 +64,7 @@ jobs:
             sleep 2
           done
 
-      - name: 서버 검증 (verify 1~6b + 6.5 하드닝 a/b/c + 7 프록시 신뢰)
+      - name: 서버 검증 (verify 1~6b + 6.5 하드닝 a/b/c + 7 프록시 신뢰·데모 가드·LiveKit 타임아웃)
         run: |
           pnpm --filter @multi-live/api verify:phase1
           pnpm --filter @multi-live/api verify:phase2
@@ -78,6 +78,7 @@ jobs:
           pnpm --filter @multi-live/api verify:phase65c
           pnpm --filter @multi-live/api verify:phase7
           pnpm --filter @multi-live/api verify:phase7demo
+          pnpm --filter @multi-live/api verify:phase7timeout
 
       - name: Playwright 브라우저 캐시
         uses: actions/cache@v4

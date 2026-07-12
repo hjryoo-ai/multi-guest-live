@@ -58,7 +58,7 @@
 - **pnpm audit**: 18건(2 low·10 moderate·6 high) — 대부분 **Next.js** 권고(≥15.5.16 패치). 현재 Next 14 → **Next 15 메이저 업그레이드는 배포 직전 리스크**라 백로그. API(fastify/zod/drizzle) 측 고위험 없음.
 - **미사용 의존성·TS strict `any/!` 정리**(C-4-3): 시간 판단으로 스킵(백로그).
 - **B-2 참가자 인덱스 (room_id,state)**: 현재 (room_id) 인덱스로 충분(방당 참가자 ≤~230), 필요 시 0003 마이그레이션.
-- **B-5-2 전 LiveKit 호출 타임아웃 래핑**: health 체크에만 적용. 전면 래핑은 후속.
+- **B-5-2 전 LiveKit 호출 타임아웃 래핑**: ~~health 체크에만 적용. 전면 래핑은 후속.~~ → **완료**(아래 §7-lite LiveKit 타임아웃).
 - **A-3 세션 IP 상한 로컬 검증**: loopback 예외라 로컬에서 429 미검(프로덕션 활성). per-user 경로로 rate limit 동작을 대표 검증.
 
 ## 백업 방침(C-4-4, 문서화만)
@@ -83,6 +83,27 @@
 - A) `TRUST_PROXY=1`: leftmost 주입 무력화 + 서로 다른 IP 버킷 분리.
 - B) `TRUST_PROXY` 미설정·production: XFF 완전 무시(소켓 IP 합산) + **프로덕션 loopback 비예외 직접 관측**
   (6.5 때 "로컬 429 미검(loopback 예외)"으로 남겼던 A-3 IP 상한을 이제 관측으로 고정).
+
+## Phase 7-lite — LiveKit 업스트림 호출 타임아웃 (B-5-2 후속 완료)
+
+**동기**: `RoomServiceClient`/`EgressClient` REST 호출은 LiveKit(자체호스트·Cloud)이 느리거나
+무응답이면 무한정 매달린다. 6.5 때는 `checkLiveKitReachable`(health)만 상한을 두고 나머지는 백로그로
+남겼는데, 데모 UX(방 만들기·QR 화면)에서 이 호출이 굳으면 버튼이 멈춘 채로 사용자에게 노출된다.
+
+**수정**:
+- `withLivekitTimeout(op, label, ms?)`(`src/lib/livekitTimeout.ts`) — 모든 LiveKit **네트워크** 호출을
+  시간 상한으로 감쌈. `livekit.ts`(create/delete/list/get/mute/update/removeParticipant/sendData) +
+  `egress.ts`(startRoomComposite/stopEgress) 전 호출부. 상한 초과 → `LivekitTimeoutError`(statusCode 504).
+- **제외**: `AccessToken.toJwt`(로컬 서명)·`WebhookReceiver.receive`(로컬 검증)는 네트워크가 아니므로
+  래핑하지 않는다. `checkLiveKitReachable` 은 health 전용의 더 짧은 자체 상한(5s)을 유지.
+- 상한값 `LIVEKIT_TIMEOUT_MS`(config, 기본 **10s**) — 정상 경로 오탐 방지 여유(CI 로컬 LiveKit 은 빠름).
+- 중앙 에러 핸들러: 5xx 마스킹(→ internal_error) **앞에** 504 분기를 두어 `livekit_timeout` 코드를 보존.
+  `ERROR_CODES.livekitTimeout` 레지스트리 등록(클라이언트 분기 참조).
+- 멱등 정리 경로(`deleteRoom`·`stopEgress`)는 기존 try/catch 가 타임아웃도 삼켜 "무한 대기"만 끊는다.
+
+**검증**(`verify:phase7timeout`, 게이트 편입 · 인프라 불필요): (1) 상한 초과 → `LivekitTimeoutError`
+(code=livekit_timeout·statusCode=504), (2) 이내 즉시 resolve 통과, (3) 지연이나 상한 이내면 통과(오탐 없음),
+(4) 라우트 전파 시 중앙 핸들러가 504 `{error:"livekit_timeout"}` 로 매핑(internal_error 아님).
 
 ## AC 충족
 
