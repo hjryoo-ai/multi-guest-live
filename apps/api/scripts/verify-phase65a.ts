@@ -227,12 +227,23 @@ function runBoot(env: Record<string, string>): Promise<{
 
 async function partBoot() {
   console.log("── C-3 부트 fail-fast ────────────────────────");
+  // 유효한 프로덕션 기준 env — Cloud 주소(TLS·비로컬)까지 명시(§7-lite 1-2).
+  const prodBase = {
+    NODE_ENV: "production",
+    AUTH_SECRET: "x".repeat(40),
+    LIVEKIT_API_SECRET: "y".repeat(40),
+    LIVEKIT_API_KEY: "prodkey",
+    CORS_ORIGINS: "https://app.example.com",
+    LIVEKIT_URL: "https://demo.livekit.cloud",
+    NEXT_PUBLIC_LIVEKIT_URL: "wss://demo.livekit.cloud",
+    NEXT_PUBLIC_API_URL: "https://api.example.com",
+  } as const;
+
   // 프로덕션 + 약한 시크릿 → 부트 실패(exit≠0) + 원인 출력.
   const weak = await runBoot({
-    NODE_ENV: "production",
+    ...prodBase,
     AUTH_SECRET: "devkey",
     LIVEKIT_API_SECRET: "devsecret_change_me_0123456789abcdef",
-    CORS_ORIGINS: "https://app.example.com",
   });
   assert(
     weak.code !== 0 && /환경변수 검증 실패|AUTH_SECRET/.test(weak.out),
@@ -240,29 +251,42 @@ async function partBoot() {
     weak.out.slice(0, 200),
   );
   // 프로덕션 + CORS '*' → 부트 실패.
-  const star = await runBoot({
-    NODE_ENV: "production",
-    AUTH_SECRET: "x".repeat(40),
-    LIVEKIT_API_SECRET: "y".repeat(40),
-    LIVEKIT_API_KEY: "prodkey",
-    CORS_ORIGINS: "*",
-  });
+  const star = await runBoot({ ...prodBase, CORS_ORIGINS: "*" });
   assert(
     star.code !== 0 && /CORS_ORIGINS/.test(star.out),
     "프로덕션 CORS '*' → 부트 실패",
     star.out.slice(0, 200),
   );
-  // 프로덕션 + 강한 시크릿 + 명시 CORS → 부트 성공.
-  const strong = await runBoot({
-    NODE_ENV: "production",
-    AUTH_SECRET: "x".repeat(40),
-    LIVEKIT_API_SECRET: "y".repeat(40),
-    LIVEKIT_API_KEY: "prodkey",
-    CORS_ORIGINS: "https://app.example.com",
+  // §7-lite 1-2: 프로덕션 + self-host/dev LiveKit 주소 → 부트 실패(은연중 self-host 차단).
+  const wsUrl = await runBoot({
+    ...prodBase,
+    NEXT_PUBLIC_LIVEKIT_URL: "ws://livekit.example.com:7880",
   });
   assert(
+    wsUrl.code !== 0 && /NEXT_PUBLIC_LIVEKIT_URL/.test(wsUrl.out),
+    "프로덕션 ws://(비TLS) LiveKit URL → 부트 실패",
+    wsUrl.out.slice(0, 200),
+  );
+  const lkLocal = await runBoot({
+    ...prodBase,
+    LIVEKIT_URL: "http://localhost:7880",
+  });
+  assert(
+    lkLocal.code !== 0 && /LIVEKIT_URL/.test(lkLocal.out),
+    "프로덕션 localhost LiveKit URL → 부트 실패",
+    lkLocal.out.slice(0, 200),
+  );
+  const apiMissing = await runBoot({ ...prodBase, NEXT_PUBLIC_API_URL: "" });
+  assert(
+    apiMissing.code !== 0 && /NEXT_PUBLIC_API_URL/.test(apiMissing.out),
+    "프로덕션 공개 API URL 미설정 → 부트 실패",
+    apiMissing.out.slice(0, 200),
+  );
+  // 프로덕션 + 강한 시크릿 + 명시 CORS + Cloud(TLS) 주소 → 부트 성공.
+  const strong = await runBoot({ ...prodBase });
+  assert(
     strong.code === 0 && /BOOT_OK true/.test(strong.out),
-    "프로덕션 강한 시크릿 + 명시 CORS → 부트 성공",
+    "프로덕션 강한 시크릿 + CORS + Cloud(TLS) 주소 → 부트 성공",
     strong.out.slice(0, 200),
   );
 }

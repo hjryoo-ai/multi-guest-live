@@ -135,6 +135,40 @@ const envSchema = z
         message: "프로덕션에서는 CORS_ORIGINS 에 와일드카드('*')를 허용하지 않습니다.",
       });
     }
+    // Cloud 전제(§7-lite 1-2): LiveKit·공개 API 주소가 self-host/dev(localhost·비TLS) 면 거부.
+    //   dev 기본값(http://localhost:7880·ws://…)으로 프로덕션이 "은연중" 부팅되는 것을 차단.
+    const rejectSelfHostUrl = (
+      name: "LIVEKIT_URL" | "NEXT_PUBLIC_LIVEKIT_URL" | "NEXT_PUBLIC_API_URL",
+      val: string | undefined,
+      schemes: string[],
+    ) => {
+      if (!val || val.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [name],
+          message: `프로덕션에서는 ${name} 를 명시해야 합니다(${schemes.join(" 또는 ")} · dev 기본값 사용 불가).`,
+        });
+        return;
+      }
+      const local = /localhost|127\.0\.0\.1|::1/i.test(val);
+      const okScheme = schemes.some((s) => val.toLowerCase().startsWith(s));
+      if (local || !okScheme) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [name],
+          message: `프로덕션에서는 ${name} 가 ${schemes.join(" 또는 ")} 의 비-로컬 주소여야 합니다(ws://·localhost 등 self-host/dev 값 금지).`,
+        });
+      }
+    };
+    rejectSelfHostUrl("LIVEKIT_URL", env.LIVEKIT_URL, ["https://", "wss://"]);
+    rejectSelfHostUrl("NEXT_PUBLIC_LIVEKIT_URL", env.NEXT_PUBLIC_LIVEKIT_URL, [
+      "wss://",
+    ]);
+    rejectSelfHostUrl(
+      "NEXT_PUBLIC_API_URL",
+      env.NEXT_PUBLIC_API_URL ?? env.PUBLIC_API_URL,
+      ["https://"],
+    );
   });
 
 const parsed = envSchema.safeParse(process.env);
