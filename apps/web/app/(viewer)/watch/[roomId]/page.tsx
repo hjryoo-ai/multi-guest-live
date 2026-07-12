@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { LiveKitRoom, RoomAudioRenderer } from "@livekit/components-react";
 import type { RoomDetailDto } from "@multi-live/shared";
 import { LIVEKIT_URL } from "../../../../lib/env";
@@ -16,8 +16,8 @@ import { EndedState, ErrorState } from "../../../../components/state";
 import { Button } from "../../../../components/ui";
 import { roomOptions } from "../../../../lib/lkOptions";
 
-export default function WatchPage({ params }: { params: { roomId: string } }) {
-  const roomId = params.roomId;
+export default function WatchPage({ params }: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = use(params);
   const [nickname, setNickname] = useState("");
   const [room, setRoom] = useState<RoomDetailDto | null>(null);
   const [token, setToken] = useState("");

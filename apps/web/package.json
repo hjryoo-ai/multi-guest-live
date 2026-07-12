@@ -18,7 +18,7 @@
     "@multi-live/shared": "workspace:*",
     "hls.js": "^1.5.17",
     "livekit-client": "^2.7.5",
-    "next": "^14.2.18",
+    "next": "^15.5.20",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zod": "^3.23.8"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { use, useCallback, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   LiveKitRoom,
@@ -22,8 +22,8 @@ import { Button } from "../../../../components/ui";
 import { useToast } from "../../../../components/ui";
 import { roomOptions } from "../../../../lib/lkOptions";
 
-export default function JoinPage({ params }: { params: { roomId: string } }) {
-  const roomId = params.roomId;
+export default function JoinPage({ params }: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = use(params);
   const search = useSearchParams();
   const toast = useToast();
   const [nickname, setNickname] = useState("");
