@@ -17,13 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # pnpm 버전은 package.json 의 "packageManager" 에서 읽는다.
-      # (action 의 with.version 을 동시에 주면 v4 가 중복으로 거부함)
-      - uses: pnpm/action-setup@v4
+      # (with.version 을 동시에 주면 action 이 중복으로 거부 — packageManager 를 단일 출처로 유지)
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm # pnpm store 캐시
@@ -81,7 +81,7 @@ jobs:
           pnpm --filter @multi-live/api verify:phase7timeout
 
       - name: Playwright 브라우저 캐시
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}

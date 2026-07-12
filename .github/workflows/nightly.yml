@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # pnpm 버전은 package.json 의 "packageManager" 에서 읽는다.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm
@@ -47,7 +47,7 @@ jobs:
           nohup pnpm --filter @multi-live/api dev > /tmp/api.log 2>&1 &
           for i in $(seq 1 30); do curl -sf http://localhost:4000/health && break; sleep 2; done
       - name: Playwright 브라우저 캐시
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}

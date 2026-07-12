@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # 골격 단계: 빌드 대상(Dockerfile)이 아직 없으면 명확히 실패시켜
       # "우연히 그린"으로 오해되지 않게 한다. #7 에서 Dockerfile 추가되면 통과.
