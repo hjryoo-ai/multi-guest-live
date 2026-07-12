@@ -16,6 +16,7 @@ import {
   startHostGraceSweeper,
   stopHostGraceSweeper,
 } from "./services/hostGrace.js";
+import { startDemoSweeper, stopDemoSweeper } from "./services/demoSweeper.js";
 import { redis } from "./services/redis.js";
 import { closeDb } from "./db/index.js";
 
@@ -134,6 +135,7 @@ async function main() {
     hardExit.unref?.();
     try {
       stopHostGraceSweeper(); // 종료 중 방을 잘못 닫지 않도록 스위퍼부터 정지.
+      stopDemoSweeper();
       await app.close(); // 신규 요청 거부 + 진행 요청 drain.
       await Promise.allSettled([redis.quit(), closeDb()]);
       app.log.info("graceful shutdown 완료");
@@ -152,6 +154,8 @@ async function main() {
     app.log.info(`api listening on :${config.port}`);
     // host 이탈 유예 스위퍼 기동(미복귀 방 자동 종료).
     startHostGraceSweeper();
+    // 데모 가드 스위퍼(수명 만료·데이터 보존). 가드 전부 0 이면 no-op.
+    startDemoSweeper();
   } catch (err) {
     app.log.error(err);
     process.exit(1);

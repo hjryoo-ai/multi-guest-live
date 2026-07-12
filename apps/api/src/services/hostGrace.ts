@@ -1,7 +1,6 @@
-import { SIGNAL_EVENTS } from "@multi-live/shared";
 import { redis, scanKeys } from "./redis.js";
 import { getRoom } from "./rooms.js";
-import { sendSignal, deleteLiveKitRoom } from "./livekit.js";
+import { endRoomGracefully } from "./roomLifecycle.js";
 
 /**
  * host 이탈 유예(Phase 5): host 가 participant_left 하면 유예를 걸고, HOST_GRACE_SEC 안에
@@ -13,12 +12,9 @@ import { sendSignal, deleteLiveKitRoom } from "./livekit.js";
  */
 const HOST_GRACE_MS = Number(process.env.HOST_GRACE_SEC ?? 60) * 1000;
 const SWEEP_INTERVAL_MS = Number(process.env.HOST_SWEEP_MS ?? 15_000);
-const ENDING_GRACE_MS = 2_500; // ROOM_ENDING 신호 후 정리까지 유예
 
 const kHostGone = (roomId: string) => `room:${roomId}:host_gone`;
 const kPresent = (roomId: string) => `room:${roomId}:present`;
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function markHostGone(roomId: string, nowMs: number) {
   await redis.set(kHostGone(roomId), String(nowMs));
@@ -64,14 +60,8 @@ export async function sweepHostGraceOnce(
     const lock = await redis.set(`${key}:lock`, "1", "PX", 30_000, "NX");
     if (lock !== "OK") continue;
 
-    // 종료 절차: ROOM_ENDING 브로드캐스트 → 짧은 유예 → deleteRoom(room_finished 경유 정리).
-    try {
-      await sendSignal(roomId, [], { event: SIGNAL_EVENTS.ROOM_ENDING });
-    } catch {
-      /* 미접속 무시 */
-    }
-    await sleep(ENDING_GRACE_MS);
-    await deleteLiveKitRoom(roomId); // → room_finished webhook: egress stop + markRoomEnded
+    // 종료는 공유 루틴으로(ROOM_ENDING → 유예 → deleteRoom→room_finished, egress stop 포함).
+    await endRoomGracefully(roomId);
     await redis.del(key);
     ended.push(roomId);
   }
