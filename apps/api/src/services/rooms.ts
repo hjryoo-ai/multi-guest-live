@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, count } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   rooms,
@@ -30,6 +30,15 @@ function toRoomDto(r: typeof rooms.$inferSelect): RoomDto {
     createdAt: r.createdAt.toISOString(),
     endedAt: r.endedAt ? r.endedAt.toISOString() : null,
   };
+}
+
+/** 활성 방(created|live) 수 — 데모 방 상한(§7-lite 1-4) 판정용. */
+export async function countActiveRooms(): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(rooms)
+    .where(inArray(rooms.status, ["created", "live"]));
+  return row?.n ?? 0;
 }
 
 export async function createRoomRecord(hostId: string, input: CreateRoomInput) {

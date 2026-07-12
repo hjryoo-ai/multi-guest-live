@@ -334,6 +334,7 @@ export const ERROR_CODES = {
   // 방/참가자
   roomNotFound: "room_not_found",
   roomEnded: "room_ended",
+  demoRoomCap: "demo_room_cap",
   participantNotFound: "participant_not_found",
   participantNotConnected: "participant_not_connected",
   hostCannotRequest: "host_cannot_request",

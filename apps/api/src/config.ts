@@ -83,6 +83,10 @@ const envSchema = z
     BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(1_048_576),
     // 리버스 프록시 신뢰 설정(위 parseTrustProxy 참조). 미설정=직결(false).
     TRUST_PROXY: z.string().optional(),
+    // 데모 가드(§7-lite 1-4) — 전부 기본값이 "비활성"이라 dev/E2E 무영향.
+    MAX_CONCURRENT_ROOMS: z.coerce.number().int().nonnegative().default(0), // 0=무제한
+    MAX_ROOM_LIFETIME_MIN: z.coerce.number().int().nonnegative().default(0), // 0=무제한
+    DATA_RETENTION_HOURS: z.coerce.number().int().nonnegative().default(0), // 0=삭제 안 함
   })
   .superRefine((env, ctx) => {
     // 형식 fail-fast(전 환경) — 잘못된 CIDR/IP 는 부트에서 즉시 거부(C-3 원칙).
@@ -210,6 +214,12 @@ export const config = {
   bodyLimit: env.BODY_LIMIT_BYTES,
   // 리버스 프록시 뒤 req.ip 산출 신뢰 정책(Fastify trustProxy 로 전달).
   trustProxy: parseTrustProxy(env.TRUST_PROXY),
+  // 데모 가드(§7-lite 1-4). 값 0 = 해당 가드 비활성(데모 배포에서만 env 로 켠다).
+  demo: {
+    maxConcurrentRooms: env.MAX_CONCURRENT_ROOMS,
+    maxRoomLifetimeMs: env.MAX_ROOM_LIFETIME_MIN * 60_000,
+    dataRetentionMs: env.DATA_RETENTION_HOURS * 3_600_000,
+  },
   tokenTtlSec: env.TOKEN_TTL_SEC,
   metricsToken: env.METRICS_TOKEN,
   // HLS egress 출력 디렉터리(egress 컨테이너의 /out 공유 볼륨과 대응). /hls 로 정적 서빙.

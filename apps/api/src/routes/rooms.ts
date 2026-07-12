@@ -19,6 +19,7 @@ import { config } from "../config.js";
 import { requireAuth } from "../plugins/authGuard.js";
 import { limitPerUser } from "../plugins/rateLimit.js";
 import {
+  countActiveRooms,
   createRoomRecord,
   getRoom,
   getRoomDetail,
@@ -132,6 +133,16 @@ export async function roomRoutes(app: FastifyInstance) {
       return reply
         .code(400)
         .send({ error: "invalid_body", issues: parsed.error.issues });
+    }
+    // 데모 방 상한(§7-lite 1-4): 기본 0=무제한. 초과 시 503 + Retry-After(용량 소진 의미).
+    if (
+      config.demo.maxConcurrentRooms > 0 &&
+      (await countActiveRooms()) >= config.demo.maxConcurrentRooms
+    ) {
+      return reply
+        .code(503)
+        .header("retry-after", "60")
+        .send({ error: "demo_room_cap" });
     }
     const room = await createRoomRecord(req.user!.sub, parsed.data);
     await createLiveKitRoom(room.id, room.maxGuests);
