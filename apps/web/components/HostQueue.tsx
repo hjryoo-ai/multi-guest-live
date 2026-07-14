@@ -16,6 +16,7 @@ import {
   apiReject,
 } from "../lib/api";
 import { rejectSpoofedSignal } from "../lib/signal";
+import { QUEUE_POLL_MS } from "../lib/timings";
 
 /**
  * 승인 대기 큐 (host 전용).
@@ -59,7 +60,7 @@ export function HostQueue({
 
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 20_000); // 저빈도 fallback
+    const t = setInterval(refresh, QUEUE_POLL_MS); // 저빈도 fallback
     return () => clearInterval(t);
   }, [refresh]);
 

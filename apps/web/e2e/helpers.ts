@@ -1,4 +1,13 @@
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { QUEUE_POLL_MS } from "../lib/timings";
+
+/**
+ * 승인 큐행 가시성 대기 상한(ms). 제품 폴백 폴링 주기(QUEUE_POLL_MS)에서 파생 — 신호가
+ * 유실돼도 1폴링 주기 안에는 행이 뜨는 게 설계 보증이므로, 그 주기를 **초과**해 대기해야
+ * 보증 경계 밖에서 판정한다(@heavy 8명 부하에서 마지막 게스트 큐행 지연 레이스 방지).
+ * 폴링 주기를 바꾸면 이 값은 자동으로 함께 움직인다.
+ */
+export const QUEUE_ROW_WAIT_MS = Math.round(QUEUE_POLL_MS * 1.5);
 
 export interface Peer {
   ctx: BrowserContext;
@@ -108,7 +117,7 @@ export async function approveAs(
   const row = hostPage.locator(
     `[data-testid="join-request-row"][data-nick="${nickname}"]`,
   );
-  await expect(row).toBeVisible({ timeout: 20_000 });
+  await expect(row).toBeVisible({ timeout: QUEUE_ROW_WAIT_MS });
   const label = role === "speaker" ? "스피커로 승인" : "게스트로 승인";
   await row.getByRole("button", { name: label }).click();
 }
