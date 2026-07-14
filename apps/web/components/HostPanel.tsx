@@ -99,6 +99,8 @@ export function HostPanel({
               return (
                 <li
                   key={p.identity}
+                  data-testid="participant-row"
+                  data-nick={name}
                   style={{
                     display: "flex",
                     alignItems: "center",

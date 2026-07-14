@@ -1,8 +1,10 @@
 import { test, expect } from "@playwright/test";
 import {
+  approveAs,
   assertAudioReach,
   bringUpGuests,
   createHost,
+  joinGuest,
   kick,
   waitUpgraded,
   subscribedRemoteAudioCount,
@@ -116,6 +118,39 @@ test("[G3 승인 → G1 강퇴] — 강퇴 후 잔여 전원 도달", async ({ b
   await g1!.ctx.close();
   await g2!.ctx.close();
   await g3!.ctx.close();
+});
+
+test("[승인 큐 스코프] 참가자·요청 탭 행 공존에서 정확 승인 — 마스킹 회귀 방지", async ({
+  browser,
+}) => {
+  // 이 테스트의 존재 이유: @heavy 에서만 터졌던 approveAs 이중매치 버그를 게이트로 승격.
+  //   host 패널의 참가자/요청 탭은 display 토글(상시 마운트)이라, 승인 전 게스트는
+  //   참가자 탭에 'viewer 행'(…시청)으로, 요청 탭에 '큐 행'(…게스트로 승인)으로 동시 존재한다.
+  //   게이트가 못 잡았던 건 버그가 없어서가 아니라, 소규모에서 승인이 viewer 행 렌더보다
+  //   먼저 끝나 1매치로 우연히 통과(타이밍 마스킹)했기 때문 — 여기서 공존을 결정적으로 만든다.
+  const host = await createHost(browser, "호스트");
+  const g1 = await joinGuest(browser, host.roomId, host.code, "게스트1");
+
+  // 두 탭 행이 host DOM 에 동시 존재할 때까지 대기(숨은 탭도 상시 마운트 → 가시성 무관 count).
+  await expect(
+    host.page.locator('[data-testid="participant-row"][data-nick="게스트1"]'),
+  ).toHaveCount(1, { timeout: 20_000 });
+  await expect(
+    host.page.locator('[data-testid="join-request-row"][data-nick="게스트1"]'),
+  ).toHaveCount(1, { timeout: 20_000 });
+
+  // 마스킹이 실재함을 못박는다: 스코프 없는 옛 셀렉터는 이 상태에서 2매치로 깨진다.
+  // (스코프 회귀가 생기면 아래 approveAs 가 strict violation 으로 결정적 실패)
+  expect(
+    await host.page.locator("li", { hasText: "게스트1" }).count(),
+  ).toBeGreaterThanOrEqual(2);
+
+  // 스코프된 approveAs 는 요청 큐 행만 정확히 집어 승인 → 게스트 승격.
+  await approveAs(host.page, "게스트1", "guest");
+  await waitUpgraded(g1.page);
+
+  await host.ctx.close();
+  await g1.ctx.close();
 });
 
 test("@heavy 8명 동시 접속 전수 오디오 도달", async ({ browser }) => {

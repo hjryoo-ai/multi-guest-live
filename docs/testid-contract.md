@@ -50,6 +50,8 @@
 | `chat-jump` | "새 메시지 ↓" 점프 배지 — **구현됨(6.6 Viewer)** |
 | `chat-retry` | 전송 실패 재시도 버튼(`↻ 다시 보내기`) — **구현됨(6.6 Viewer)** |
 | `host-panel` | host 우측 패널(참가자/요청/채팅 탭) — **구현됨(6.6 Host)**. 탭은 `role="tab"` (`참가자 N` / `요청` / `채팅`), 기본 활성 = `요청` |
+| `participant-row` | 참가자 탭의 행(HostPanel) — `data-nick`. **컨테이너 스코프 앵커**(승인 전 게스트는 여기 `…시청` 행으로도 존재) |
+| `join-request-row` | 요청 탭 승인 큐 행(HostQueue) — `data-nick`. `approveAs` 가 `[data-testid="join-request-row"][data-nick=…]` 로 정확·스코프 선택 |
 | `host-panel-sheet` | 모바일 host 하단 시트 — **구현됨(6.6 Host)**. 좁은 화면(<900px)에서 `관리` 버튼으로 오픈 |
 | `confirm-dialog` | 파괴적 액션 컨펌 — 구현됨 |
 | `toast` | 토스트(성공/실패/정보) — 구현됨 |
@@ -77,3 +79,18 @@
 조작하는 스펙은 먼저 채팅 탭을 열어야 한다 → `helpers.openHostChat(page)` = `getByRole("tab",{name:"채팅"}).click()`.
 반영된 스펙: `phase4`(승인 후), `phase65a`(승인 후), `phase6b`(생성 직후). kick 은 타일 버튼이라 무관.
 탭은 display 토글(상시 마운트)이라 전환·폴링에도 채팅/큐 상태가 보존된다.
+
+### 셀렉터 스코프 규칙 (상시 마운트 탭 — 필수)
+
+host 패널 탭이 **display 토글 상시 마운트**라는 사실은 셀렉터에 직접적 제약을 만든다:
+**참가자 / 요청 두 리스트의 `<li>` 가 (숨은 탭 포함) DOM 에 항상 공존**한다. 따라서 —
+
+- **모든 행 셀렉터는 컨테이너 스코프 필수**다. `locator("li",{hasText:닉})` 처럼 스코프 없는
+  선택은 승인 전 게스트에서 참가자 탭 `…시청` 행과 요청 탭 `…게스트로 승인` 행에 **이중 매치**
+  (Playwright strict violation)된다. 반드시 `participant-row` / `join-request-row` 로 좁힌다.
+- **닉네임은 정확 일치**로: `data-nick="게스트1"` 은 `게스트10` 에 부분매치되지 않는다.
+- **`data-nick` 는 tile·speaker-chip·join-request-row·participant-row 가 공유**한다. 이 속성만으로
+  선택하면 다중 매치되므로 **반드시 `[data-testid=…]` 와 결합**한다(예: `kick` = `[data-testid="tile"][data-nick=…]`).
+- 이 규칙의 게이트 회귀 방지 테스트: `phase3` "[승인 큐 스코프] … 마스킹 회귀 방지" —
+  참가자·요청 행 공존을 결정적으로 만들어 스코프 회귀 시 게이트에서 즉시 실패한다.
+  (원래 이 버그는 `@heavy`(nightly)에서만 드러났다 → 게이트로 승격.)

@@ -103,7 +103,11 @@ export async function approveAs(
   nickname: string,
   role: "guest" | "speaker" = "guest",
 ) {
-  const row = hostPage.locator("li", { hasText: nickname });
+  // 요청 큐 행으로 스코프(정확 일치). host 패널은 참가자/요청 탭이 상시 마운트라
+  // 스코프 없는 li·닉네임 셀렉터는 참가자 탭의 'viewer 행'과 이중 매치된다(strict violation).
+  const row = hostPage.locator(
+    `[data-testid="join-request-row"][data-nick="${nickname}"]`,
+  );
   await expect(row).toBeVisible({ timeout: 20_000 });
   const label = role === "speaker" ? "스피커로 승인" : "게스트로 승인";
   await row.getByRole("button", { name: label }).click();
@@ -146,7 +150,9 @@ export async function remoteVideoCount(
 
 /** host 스테이지에서 특정 닉네임 타일의 강퇴 버튼 클릭. */
 export async function kick(hostPage: Page, nickname: string) {
-  const tile = hostPage.locator(`[data-nick="${nickname}"]`);
+  // 스테이지 타일로 스코프. data-nick 은 tile·speaker-chip·요청 큐 행이 공유하므로
+  // testid 로 좁히지 않으면 이중/삼중 매치된다(참가자/요청 탭 상시 마운트).
+  const tile = hostPage.locator(`[data-testid="tile"][data-nick="${nickname}"]`);
   await expect(tile).toBeVisible({ timeout: 20_000 });
   await tile.getByRole("button", { name: "강퇴" }).click();
   // Phase 6.6: 파괴적 액션은 컨펌 다이얼로그 → "강퇴하기" 확정.
