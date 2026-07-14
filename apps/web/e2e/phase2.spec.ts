@@ -63,8 +63,12 @@ test("host ↔ guest 상호 오디오 도달 (subscribedAudioTracks == 1)", asyn
     .toBe(true);
 
   // ── host: 승인 큐에서 게스트 승인 ───────────────────────────
-  await expect(host.getByText("게스트E2E")).toBeVisible({ timeout: 20_000 });
-  await host.getByRole("button", { name: "게스트로 승인" }).click();
+  // 요청 큐 행으로 스코프 — 참가자 탭 상시 마운트라 닉네임/버튼 셀렉터는 컨테이너 스코프 필수.
+  const queueRow = host.locator(
+    '[data-testid="join-request-row"][data-nick="게스트E2E"]',
+  );
+  await expect(queueRow).toBeVisible({ timeout: 20_000 });
+  await queueRow.getByRole("button", { name: "게스트로 승인" }).click();
 
   // guest 승격 → 출연 중
   await expect(guest.getByText("🎙️ 출연 중")).toBeVisible({ timeout: 20_000 });

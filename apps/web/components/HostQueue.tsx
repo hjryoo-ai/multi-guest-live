@@ -143,6 +143,8 @@ export function HostQueue({
           {requests.map((r) => (
             <li
               key={r.userId}
+              data-testid="join-request-row"
+              data-nick={r.nickname}
               style={{
                 display: "flex",
                 flexDirection: "column",

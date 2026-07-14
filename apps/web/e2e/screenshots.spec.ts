@@ -153,7 +153,9 @@ test("host 요청 큐(승인 대기)", async ({ browser }) => {
   await host.page.setViewportSize({ width: 1280, height: 800 });
   // 게스트가 대기실 입장 → 요청 큐에 노출(기본 탭이 요청).
   const guest = await joinGuest(browser, host.roomId, host.code, "지원게스트");
+  // 요청 큐 행으로 스코프(참가자 탭 상시 마운트 → 컨테이너 스코프 필수).
   await host.page
+    .locator('[data-testid="join-request-row"][data-nick="지원게스트"]')
     .getByRole("button", { name: "게스트로 승인" })
     .waitFor({ timeout: 20_000 });
   await host.page.screenshot({ path: shot("host-queue-desktop") });
