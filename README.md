@@ -38,26 +38,27 @@
 ## 아키텍처
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Client
-        H[Host / Guest / Speaker] --- V[Viewer]
+        H[Host / Guest / Speaker]
+        V[Viewer]
     end
     subgraph Vercel
         W[Next.js Web]
-    end
-    subgraph LK["LiveKit Cloud"]
-        SFU[SFU · TURN · TLS]
     end
     subgraph VPS["VPS (docker compose)"]
         C[Caddy] --> A[Fastify API]
         A --> P[(PostgreSQL)]
         A --> R[(Redis)]
     end
+    subgraph LK["LiveKit Cloud"]
+        SFU[SFU · TURN · TLS]
+    end
     Client -->|HTTPS| W
-    Client <-->|WebRTC| SFU
     W -->|REST| C
-    SFU -->|Webhook| C
+    Client <-->|WebRTC| SFU
     A -->|Server SDK| SFU
+    SFU -->|Webhook| C
 ```
 
 로컬 개발은 동일 코드로 self-host LiveKit(OSS 컨테이너)을 사용합니다 — Cloud/self-host 전환은 env뿐.
