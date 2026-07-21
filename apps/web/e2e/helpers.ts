@@ -2,12 +2,27 @@ import { expect, type Browser, type BrowserContext, type Page } from "@playwrigh
 import { QUEUE_POLL_MS } from "../lib/timings";
 
 /**
- * 승인 큐행 가시성 대기 상한(ms). 제품 폴백 폴링 주기(QUEUE_POLL_MS)에서 파생 — 신호가
- * 유실돼도 1폴링 주기 안에는 행이 뜨는 게 설계 보증이므로, 그 주기를 **초과**해 대기해야
- * 보증 경계 밖에서 판정한다(@heavy 8명 부하에서 마지막 게스트 큐행 지연 레이스 방지).
- * 폴링 주기를 바꾸면 이 값은 자동으로 함께 움직인다.
+ * 승인 큐행 가시성 대기 상한(ms). 제품 폴백 폴링 주기(QUEUE_POLL_MS)에서 파생한다.
+ *
+ * 불변식: 대기는 폴백 주기의 **2배를 초과**해야 한다 — "1주기 초과"가 아니라 "1주기 유실을
+ * 견딤"이 옳은 하한이다. 최악은 요청이 폴 N 직후 들어오고(≈+1주기), 부하로 폴 N+1 의 refresh
+ * 가 유실/지연되는 것(≈+1주기)이라, 보증까지 최대 2주기가 걸릴 수 있다(@heavy 9-컨텍스트 부하에서
+ * 후반 speaker 큐행 지연 — phase6a S4/S3 연속 실패로 확인). 따라서 대기는 2주기를 초과해야 한다.
+ *   → 2.5× = 2주기(40s) + refresh 지연 여유 10s. 폴링 주기를 바꾸면 이 값은 자동으로 함께 움직인다.
+ *
+ * PR#12 는 이 관계를 1.5× 로 잘못 못박았고(프로즈 주석 두 곳이 막지 못함), phase6a 후반부에서
+ * 재발했다 → 아래에서 하한(2×)을 코드로 강제한다.
  */
-export const QUEUE_ROW_WAIT_MS = Math.round(QUEUE_POLL_MS * 1.5);
+export const QUEUE_ROW_WAIT_MS = Math.round(QUEUE_POLL_MS * 2.5);
+
+// 불변식 하한(머신 체크): 대기가 2×폴백주기 미만이면 로드 시점에 즉시 실패시킨다.
+// 프로즈 주석은 PR#12 에서 잘못된 배수를 막지 못했으므로, 관계를 코드로 못박는다.
+if (QUEUE_ROW_WAIT_MS < QUEUE_POLL_MS * 2) {
+  throw new Error(
+    `QUEUE_ROW_WAIT_MS(${QUEUE_ROW_WAIT_MS}ms) < 2×QUEUE_POLL_MS(${QUEUE_POLL_MS * 2}ms): ` +
+      `승인 큐행 대기는 폴백 폴링 1주기 유실을 견디도록 폴백 주기의 2배를 초과해야 한다.`,
+  );
+}
 
 export interface Peer {
   ctx: BrowserContext;
