@@ -102,6 +102,7 @@ DB 마이그레이션 포함 PR은 제목에 `[migration]` 표기. 마이그레�
 | 6b | `chore/ci-actions-bump` | `actions/*@v4` Node20 deprecation 경고 해소(동작 변경 0) | ✅ PR#10 |
 | ↳ | `fix/e2e-queue-scope` | @heavy `approveAs` 이중매치 잠복 회귀 수정 + 게이트 승격(상시 마운트 탭 스코프) | ✅ PR#11 · 게이트 15→16 |
 | ↳ | `fix/heavy-queue-wait` | @heavy 마지막 게스트 큐행 레이스 디-플레이크(테스트 대기를 폴백 주기 `QUEUE_POLL_MS`서 파생) | ✅ PR#12 |
-| ↳ | `fix/heavy-speaker-queue-wait` | @heavy `phase6a` 후반 speaker 큐행 대기 하한 재도출(1.5×→2.5×, "1주기 유실 견딤" 불변식 + 로드시점 머신체크) | ← **현재 PR** |
+| ↳ | `fix/heavy-speaker-queue-wait` | @heavy `phase6a` 후반 speaker 큐행 대기 하한 재도출(1.5×→2.5×, "1주기 유실 견딤" 불변식 + 로드시점 머신체크) | ✅ PR#15 |
 | 7 | `chore/cd-wire` | §1-6 Dockerfile 추가 + deploy.yml 실제 VPS 연결 | 다음 슬라이스 |
 | 8 | `docs/readme-portfolio` | §5 README·production-notes (GIF·데모링크는 7b 후) | ✅ PR#13 (7 보다 먼저 머지) |
+| ↳ | `docs/readme-bilingual` | README 영문 미러(`README.en.md`) + 언어 토글 — 국제 리크루터/엔지니어 대상 이중언어화 | ← **현재 PR** |
